@@ -32,29 +32,23 @@
 
 class LPDisplay
 {
-   byte m_tag;
+   byte m_chan;
    byte m_status;
    byte m_ledStatus[LP_LED_MAX];
-   byte m_updateIndex;
 public:
-   LPDisplay(byte tag)
+   LPDisplay(byte chan)
    {
      memset(m_ledStatus, 0, LP_LED_MAX);
      m_status = 0;
-     m_updateIndex = 0;
-     m_tag = tag;
+     m_chan = chan;
    }
    
 
    byte clearAll() 
    {
-     for(int i=0;i<LP_LED_MAX;++i)
-       m_ledStatus[i] = LP_STATUS_DIRTY;
-      m_status|=LP_STATUS_DIRTY;
-   }
-   void setTag(byte tag) 
-   {
-     m_tag = tag;
+    // for(int i=0;i<LP_LED_MAX;++i)
+      // m_ledStatus[i] = LP_STATUS_DIRTY;
+//      m_status|=LP_STATUS_DIRTY;
    }
    void setLed(byte led, byte col) 
    {
@@ -70,48 +64,63 @@ public:
      if(led < LP_LED_MAX)
        return m_ledStatus[led]&LP_STATUS_COLOUR_MASK;
    }
+
   
-   byte _getMsg(byte *buffer)
+   byte _getData(byte *buffer)
    {
+     int i;
+     int addr=0;
+     byte isFirst;
      if(!(m_status&LP_STATUS_DIRTY))
        return 0; // nothing to send
-       
-     byte startIndex = m_updateIndex; 
-     for(;;)
+          
+     isFirst = 1;
+     for(i=0;i<LP_RIGHT_OFS;i++)
      {
-       if(m_ledStatus[m_updateIndex]&LP_STATUS_DIRTY)
+       if(m_ledStatus[i]&LP_STATUS_DIRTY)
        {
-         buffer[0] = m_tag;
-         if(m_updateIndex<LP_RIGHT_OFS)
-         {
-           buffer[1] = 0x90;
-           buffer[2] = ((m_updateIndex/8)<<4)|(m_updateIndex&0x07);
-         }
-         else if(m_updateIndex<LP_TOP_OFS)
-         {
-           buffer[1] = 0x90;
-           buffer[2] = ((m_updateIndex-LP_RIGHT_OFS)<<4)|0x08;
-         }
-         else         
-         {
-           buffer[1] = 0xb0;
-           buffer[2] = 0x68 + m_updateIndex-LP_TOP_OFS;
-         }
-         buffer[3] = (m_ledStatus[m_updateIndex] & LP_STATUS_COLOUR_MASK);
-         m_ledStatus[m_updateIndex] &= ~LP_STATUS_DIRTY;
-         if(++m_updateIndex>=LP_LED_MAX)
-           m_updateIndex = 0;
-         return 1;
+          if(isFirst) 
+          {
+            buffer[addr++] = (0x90|m_chan);          
+            isFirst=0;
+          }
+          buffer[addr++] = ((i/8)<<4)|(i&0x07);
+          buffer[addr++] = (m_ledStatus[i] & LP_STATUS_COLOUR_MASK);
+          m_ledStatus[i] &= ~LP_STATUS_DIRTY;
        }
-       if(++m_updateIndex==LP_LED_MAX)
-         m_updateIndex = 0;
-       if(m_updateIndex == startIndex)
-       {
-         m_status&=~LP_STATUS_DIRTY;
-         return 0;
-        }       
      }
-   }
+     for(;i<LP_TOP_OFS;i++)
+     {
+       if(m_ledStatus[i]&LP_STATUS_DIRTY)
+       {
+          if(isFirst) 
+          {
+            buffer[addr++] = (0x90|m_chan);          
+            isFirst=0;
+          }
+          buffer[addr++] = ((i-LP_RIGHT_OFS)<<4)|0x08;
+          buffer[addr++] = (m_ledStatus[i] & LP_STATUS_COLOUR_MASK);
+          m_ledStatus[i] &= ~LP_STATUS_DIRTY;
+       }
+     }
+     isFirst=1;
+     for(;i<LP_LED_MAX;i++)
+     {
+       if(m_ledStatus[i]&LP_STATUS_DIRTY)
+       {
+          if(isFirst) 
+          {
+            buffer[addr++] = (0xB0|m_chan);          
+            isFirst=0;
+          }
+          buffer[addr++] = 0x68 + i-LP_TOP_OFS;
+          m_ledStatus[i] &= ~LP_STATUS_DIRTY;
+       }
+     }
+     
+     m_status&=~LP_STATUS_DIRTY;
+     return addr;
+   }   
 };
 
 /*

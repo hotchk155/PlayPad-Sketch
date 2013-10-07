@@ -1,5 +1,6 @@
 class CRainstormSketch : public IPlaypadSketch
 {
+  byte crap;
   byte grid[8];
   CSketchDriver *m_pDriver;
 public:
@@ -13,6 +14,7 @@ public:
     }
     memset(grid,0,8);
     m_pDriver->m_Timer1 = 500;
+    crap=0;
   }  
    void done()
    {
@@ -37,6 +39,8 @@ public:
          break;
        case EV_TIMER1:
          byte carry = grid[7];         
+         grid[0] = crap; 
+         crap=!crap;
          for(i=7; i>0;--i)         
            grid[i]=grid[i-1];                   
          grid[0]=carry;

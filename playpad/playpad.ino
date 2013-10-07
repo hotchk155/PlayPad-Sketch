@@ -18,6 +18,8 @@ byte ftdi_status = 0;
 #define FTDI_RXF 0x04
 #define FTDI_ACK 0x02
 
+
+
 void midi_note(byte chan, byte note, byte vel)
 {
   Serial.write(0x90|chan);
@@ -25,6 +27,7 @@ void midi_note(byte chan, byte note, byte vel)
   Serial.write(vel & 0x7f);
 }
 
+/*
 int ftdi_write(byte addr, byte *pData, int iLen)
 {
   byte command = (addr<<5)|FTDI_WRITE;
@@ -32,13 +35,48 @@ int ftdi_write(byte addr, byte *pData, int iLen)
   delayMicroseconds(1);
   ftdi_status = SPI.transfer(command); 
   int p;
-  for(p=0; p<iLen && !(ftdi_status&FTDI_RXF);p++)
+  for(p=0; p<iLen;p++)
   {
     ftdi_status = SPI.transfer(pData[p]);
   }
   delayMicroseconds(1);
   SLAVE_SELECT(HIGH);  
   return p;
+}
+*/
+
+void ftdi_write(byte addr, byte *pData, int iLen)
+{
+  int p=0;
+  byte command = (addr<<5)|FTDI_WRITE;
+  while(p<iLen)
+  {    
+      for(;;)
+      {
+        SLAVE_SELECT(LOW);  
+        delayMicroseconds(1);
+        ftdi_status = SPI.transfer(command); 
+        Serial.print("q");
+        if(!(ftdi_status & FTDI_RXF))
+          break;
+        Serial.print("f");          
+        delayMicroseconds(1);
+        SLAVE_SELECT(HIGH);  
+        delay(5);
+      }
+        
+      while(p<iLen)
+      {  
+        ftdi_status = SPI.transfer(pData[p]);
+        Serial.print("x");
+        p++; // byte sent?
+        if(ftdi_status & FTDI_RXF)
+          break;        
+      }
+  }
+        Serial.print("y");  
+  delayMicroseconds(1);
+  SLAVE_SELECT(HIGH);  
 }
 
 int ftdi_read(byte addr, byte *pData, int iLen)
@@ -62,7 +100,7 @@ int ftdi_read(byte addr, byte *pData, int iLen)
 
 
 
-LPDisplay LPA(TAG_PORTA);
+LPDisplay LPA(0);
 CSketchDriver Sketch1;
 
 void setup() {
@@ -71,8 +109,11 @@ void setup() {
   pinMode (slaveSelectPin, OUTPUT);
   pinMode(2,INPUT);
   // initialize SPI:
-  SPI.begin(); 
   Serial.begin(9600);
+  Serial.flush();
+  
+  Serial.print("Hello");
+  SPI.begin(); 
   
   Sketch1.m_pLP = &LPA;
   Sketch1.m_pSketch = new CRainstormSketch;
@@ -88,8 +129,6 @@ void loop()
     lastMillis = newMillis;
   else
     newMillis = 0;
-//  Serial.print("a");
   Sketch1.run(newMillis);
-//  Serial.print("b");
 }
 

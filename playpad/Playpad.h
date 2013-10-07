@@ -1,5 +1,5 @@
 extern void midi_note(byte chan, byte note, byte vel);
-extern int ftdi_write(byte addr, byte *pData, int iLen);
+extern void ftdi_write(byte addr, byte *pData, int iLen);
 extern int ftdi_read(byte addr, byte *pData, int iLen);
 
 enum
@@ -33,7 +33,9 @@ class CSketchDriver
  public:
   IPlaypadSketch *m_pSketch;
   LPDisplay *m_pLP;
+  byte midiParam;
   byte m_Channel;
+  byte midiMsg[3];
   unsigned short m_Timer1;
   unsigned short m_Timer2;
   unsigned short m_Timer3;
@@ -46,32 +48,55 @@ class CSketchDriver
     m_Timer2(0),
     m_Timer3(0),
     m_Timer4(0),
-    m_Timer5(0) {}
+    m_Timer5(0) 
+    {
+
+      midiMsg[0] = 0x90;
+      midiParam = 1;
+    }
     
   void run(unsigned long newMillis)
   {
-       byte msg[4];
+#define SZ_BUFFER 200    
+       byte buffer[SZ_BUFFER];
        
        // send any pending updates to launchpad
-       while(m_pLP->_getMsg(msg))
-         ftdi_write(0, msg, 4);
-       
-       // read activity from launchpad
-       if(4 == ftdi_read(0,msg,4))
-       {
+       int count = m_pLP->_getData(buffer);
+       if(count)
+         ftdi_write(0, buffer, count);
          
-         if(msg[1] == (0x90|m_Channel))
+       // read activity from launchpad
+       count = ftdi_read(0,buffer,SZ_BUFFER);
+       for(int i=0; i<count; ++i)
+       {
+         if(buffer[i]&0x80)
          {
-           byte a = (msg[2] >> 4)&0x0F;
-           byte b = msg[2]&0x0F;
-           if(b&0x08)
-             m_pSketch->handleEvent(msg[3] ? EV_RIGHT_PRESS : EV_RIGHT_RELEASE, a, 0);
-           else
-             m_pSketch->handleEvent(msg[3] ? EV_GRID_PRESS : EV_GRID_RELEASE, a, b);
+           midiMsg[0] = buffer[i];
+           midiParam = 1;
          }
-         else if(msg[1] == (0xB0|m_Channel))
+         else if(midiParam == 1)
          {
-           m_pSketch->handleEvent(msg[3] ? EV_TOP_PRESS : EV_TOP_RELEASE, msg[2] - 0x68, 0);
+           midiMsg[1] = buffer[i];
+           midiParam = 2;
+         }
+         else if(midiParam == 2)
+         {
+           midiMsg[2] = buffer[i];
+           midiParam = 1;
+         
+           if(midiMsg[0] == (0x90|m_Channel))
+           {
+             byte a = (midiMsg[1] >> 4)&0x0F;
+             byte b = midiMsg[1]&0x0F;
+             if(b&0x08)
+               m_pSketch->handleEvent(midiMsg[2] ? EV_RIGHT_PRESS : EV_RIGHT_RELEASE, a, 0);
+             else
+               m_pSketch->handleEvent(midiMsg[2] ? EV_GRID_PRESS : EV_GRID_RELEASE, a, b);
+           }
+           else if(midiMsg[0] == (0xB0|m_Channel))
+           {
+             m_pSketch->handleEvent(midiMsg[2] ? EV_TOP_PRESS : EV_TOP_RELEASE, midiMsg[1] - 0x68, 0);
+           }
          }
        }
        
