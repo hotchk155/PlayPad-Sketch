@@ -1,6 +1,6 @@
+
 extern void midi_note(byte chan, byte note, byte vel);
-extern void ftdi_write(byte addr, byte *pData, int iLen);
-extern int ftdi_read(byte addr, byte *pData, int iLen);
+extern class VNC2SPI VNC2;
 
 enum
 {
@@ -63,10 +63,10 @@ class CSketchDriver
        // send any pending updates to launchpad
        int count = m_pLP->_getData(buffer);
        if(count)
-         ftdi_write(0, buffer, count);
+         VNC2.write(0, buffer, count);
          
        // read activity from launchpad
-       count = ftdi_read(0,buffer,SZ_BUFFER);
+       count = VNC2.read(0,buffer,SZ_BUFFER);
        for(int i=0; i<count; ++i)
        {
          if(buffer[i]&0x80)
