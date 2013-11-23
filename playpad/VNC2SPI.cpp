@@ -10,7 +10,7 @@
 
 ////////////////////////////////////////////////////////////////////////////
 // Set up SPI
-void VNC2SPI::begin(byte ssPin, byte addr = 0);
+void VNC2SPI::begin(byte ssPin)
 {
   m_ssPin = ssPin;
   m_addr = addr;

@@ -8,7 +8,7 @@
 
 
 
-VNC2SPI VNC2(10,0);
+VNC2SPI VNC2;
 
 
 
