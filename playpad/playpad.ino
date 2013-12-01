@@ -2,13 +2,15 @@
 // inslude the SPI library:
 #include <SPI.h>
 #include "VNC2SPI.h"
-#include "LPDisplay.h"
-#include "Playpad.h"
-#include "RainstormSketch.h"
+#include "LaunchpadInput.h"
+#include "OutputDriver.h"
+#include "PlaypadSketch.h"
+#include "EchoTest.h"
 
 
 
-VNC2SPI VNC2;
+#define VNC2_SS_PIN 10
+VNC2SPI VNC2(VNC2_SS_PIN);
 
 
 
@@ -21,71 +23,69 @@ void midi_note(byte chan, byte note, byte vel)
 
 
 
-LPDisplay LPA(0);
-CSketchDriver Sketch1;
-
-void setup() {
-  
-  // initialize SPI:
-  Serial.begin(9600);
-  Serial.flush();
-  
-  Serial.print("Hello");
-  SPI.begin(); 
-  
-  Sketch1.m_pLP = &LPA;
-  Sketch1.m_pSketch = new CRainstormSketch;
-  Sketch1.m_pSketch->init(&Sketch1);
-}
-
-
 unsigned long lastMillis;
 
 
   #define SZ_BUFFER 200    
 
 #define MAX_SKETCHES 4
-ISketchDriver* apSketchDrivers[MAX_SKETCHES];
+CPlaypadSketch* Sketches[MAX_SKETCHES];
 byte runningSketches = 0;
-byte outputAssignments[MAX_SKETCHES];
+byte output1Owner = 0;
+byte output2Owner = 0;
 
 
-IOutputDriver *pOutput1 = NULL;
-IOutputDriver *pOutput2 = NULL;
-
-ISketchDriver* pOutput1Owner = NULL;
-ISketchDriver* pOutput2Owner = NULL;
+COutputDriver Output1;
+COutputDriver Output2;
 
 byte inputMsg[3];
 byte inputParam1 = 0;
+
+void initSketches()
+{
+  runningSketches = 0;
+  output1Owner = 0;
+  output2Owner = 0;
+  for(int i=0; i<MAX_SKETCHES; i++)
+    Sketches[i] = NULL;
+}
+
+void setup() 
+{
+  int i;
+  // initialize SPI:
+  Serial.begin(9600);
+  Serial.flush();  
+  VNC2.begin();
+  initSketches();
+  
+  Sketches[runningSketches++] = new CEchoTest();
+}
+
+
 
 void loop() 
 {
     
   byte buffer[SZ_BUFFER];  
   int count, i, j;
-  ISketchDriver *pThisSketchDriver;
-  IOutputDriver *p1;
-  IOutputDriver *p2;
  
   // Check whether the output devices have any
   // buffered data to send
-  if(pOutput1)
-  {
-    count = pOutput1->getData(buffer, SZ_BUFFER);
-    if(count) VNC2.write(0, buffer, count);
-  }
-  if(pOutput2)
-  {
-    count = pOutput2->getData(buffer, SZ_BUFFER);
-    if(count) VNC2.write(1, buffer, count);
-  }
+  count = Output1.getData(buffer, 0, SZ_BUFFER);
+  if(count) VNC2.write(0, buffer, count);
+  count = Output2.getData(buffer, 1, SZ_BUFFER);
+  if(count) VNC2.write(1, buffer, count);
          
    // read activity from USB. The messages use
    // MIDI style presentation.
    count = VNC2.read(0,buffer,SZ_BUFFER);
    for(i=0; i<count; ++i)
    {
+       Serial.print("0x");
+       Serial.print(buffer[i], HEX);
+       Serial.print(" ");
+       
      if(buffer[i]&0x80) // start of new message
      {
        inputMsg[0] = buffer[i];
@@ -94,26 +94,22 @@ void loop()
      else if(inputParam1)
      {
        inputMsg[1] = buffer[i];
-       inputParam1 = 0
+       inputParam1 = 0;
      }
      else 
      {
-       midiMsg[2] = buffer[i];
-       inputParam = 1;
-     
-       // pass the message to all running sketches
-       for(j=0;j<runningSketches;++j)
+       inputMsg[2] = buffer[i];
+       inputParam1 = 1;       
+       if(output1Owner == output2Owner)
        {
-         switch(outputAssignments[j])
-         {
-           case 1: pThisSketchDriver->handleInput(inputMsg, Output1, NULL); break;
-           case 2: pThisSketchDriver->handleInput(inputMsg, Output2, NULL); break;
-           case 3: pThisSketchDriver->handleInput(inputMsg, Output1, Output2); break;
-           default: pThisSketchDriver->handleInput(inputMsg, NULL, NULL); break;
-         }
+         if(output1Owner >= 0) Sketches[output1Owner]->handleInput(inputMsg, &Output1, &Output2); 
+       }
+       else 
+       {
+         if(output1Owner >= 0) Sketches[output1Owner]->handleInput(inputMsg, &Output1, NULL); 
+         if(output2Owner >= 0) Sketches[output2Owner]->handleInput(inputMsg, &Output2, NULL); 
        }
      }
-   }       
   }
     
   // Every 1ms we call the handleTimer method of each sketch driver, passing
@@ -125,24 +121,19 @@ void loop()
     lastMillis = newMillis;
     for(j=0;j<runningSketches;++j)
     {
-      switch(outputAssignments[j])
-      {
-        case 1: pThisSketchDriver->handleTimer(newMillis, Output1, NULL); break;
-        case 2: pThisSketchDriver->handleTimer(newMillis, Output2, NULL); break;
-        case 3: pThisSketchDriver->handleTimer(newMillis, Output1, Output2); break;
-        default: pThisSketchDriver->handleTimer(newMillis, NULL, NULL); break;
+       if(j==output1Owner)
+       {
+         if(j==output2Owner)
+           Sketches[j]->handleTimer(newMillis, &Output1, &Output2); 
+         else
+           Sketches[j]->handleTimer(newMillis, &Output1, NULL); 
+       }
+       else if(j==output2Owner)
+         Sketches[j]->handleTimer(newMillis, &Output2, NULL); 
+       else
+         Sketches[j]->handleTimer(newMillis, NULL, NULL); 
       }
     }
   }
-    
-  
-};
-
-  
-  
-}
-
-
-
 
 

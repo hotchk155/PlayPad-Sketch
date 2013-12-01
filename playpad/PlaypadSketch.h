@@ -1,4 +1,9 @@
 /////////////////////////////////////////////////////
+//
+// Based class and interface for "sketches" that run
+// on the hib
+//
+/////////////////////////////////////////////////////
 class CPlaypadSketch
 {  
   enum { MAX_TIMERS = 4 };
@@ -13,7 +18,7 @@ public:
 
   CPlaypadSketch()
   {
-    memset(nextTimerEvent, 0, sizeof(nextTimerEvent));
+    memset(m_nextTimerEvent, 0, sizeof(m_nextTimerEvent));
     memset(m_timerPeriod, 0, sizeof(m_timerPeriod));
   }
        
@@ -24,10 +29,10 @@ public:
     {
       if(m_timerPeriod[i])
       {
-        if(nextTimerEvent[i] < ms)
+        if(m_nextTimerEvent[i] < ms)
         {
-          handleEvent(EV_TIMER0+i, pOutput1, pOutput2);
-          nextTimerEvent[i] = ms + m_timerPeriod[i];
+          handleEvent(EV_TIMER0+i, NULL, pOutput1, pOutput2);
+          m_nextTimerEvent[i] = ms + m_timerPeriod[i];
         }          
       }
     }
@@ -37,5 +42,6 @@ public:
   virtual void init() = 0;    
   virtual void done() = 0;    
   virtual void handleEvent(int iEvent, void *param, COutputDriver *pOutput1, COutputDriver *pOutput2) = 0;
+  virtual void handleInput(byte *msg, COutputDriver *pOutput1, COutputDriver *pOutput2) = 0;
   
 };

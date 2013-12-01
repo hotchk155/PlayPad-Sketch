@@ -11,7 +11,7 @@ public:
   enum {
     BUTTON_DOWN = 1,
     BUTTON_UP = 2
-  }
+  };
   byte port;
   byte type;
   byte row;

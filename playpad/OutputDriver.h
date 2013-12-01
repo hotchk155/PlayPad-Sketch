@@ -1,4 +1,11 @@
+////////////////////////////////////////////////////////////
+//
+// Class allows a running sketch to communicate out to 
+// a display device
+//
 // Currently the output is specific to Launchpad
+//
+////////////////////////////////////////////////////////////
 class COutputDriver
 {
 public:  
@@ -20,7 +27,7 @@ public:
   };
 
    byte m_status;
-   byte m_ledStatus[LP_LED_MAX];
+   byte m_ledStatus[CELL_MAX];
 public:
    COutputDriver()
    {
@@ -32,7 +39,7 @@ public:
      unsigned int index = row*9+col;
      if(index < CELL_MAX)
      {
-       if(value != (m_ledStatus[index]&CELL_LED_MASK)))
+       if(value != (m_ledStatus[index]&CELL_LED_MASK))
        {
          m_ledStatus[index] = value|CELL_DIRTY;
          m_status|=CELL_DIRTY;
@@ -44,7 +51,7 @@ public:
    {
      unsigned int index = row*9+col;
      if(index < CELL_MAX)
-       return m_ledStatus[index]&CELL_LED_MASK);
+       return (m_ledStatus[index]&CELL_LED_MASK);
      return 0;
    }
   
@@ -77,6 +84,7 @@ public:
                return addr;
          }
          ++index;
+       }
      }
      isFirst=1;
      for(col = 0x68; col < 0x70; ++col)
@@ -88,7 +96,7 @@ public:
             buffer[addr++] = (0xB0|port);          
             isFirst=0;
           }
-          buffer[addr++] = col
+          buffer[addr++] = col;
           buffer[addr++] = (m_ledStatus[index]&CELL_LED_MASK);
           m_ledStatus[index] &= ~CELL_DIRTY;
           if(addr >= maxAddr)
@@ -96,7 +104,7 @@ public:
        }
        ++index;
      }
-     m_status&=~LP_STATUS_DIRTY;
+     m_status&=~CELL_DIRTY;
      return addr;
    }   
 };
