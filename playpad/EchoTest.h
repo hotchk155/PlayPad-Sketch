@@ -7,13 +7,15 @@ public:
   void done()
   {
   }
-  void handleInput(byte *msg, COutputDriver *pOutput1, COutputDriver *pOutput2)
+  void handleInput(byte *msg, COutputDriver *pOutput)
   {
-    // Handle this event as Launchpad
-    CLaunchPadInput Input(msg);
-    COutputDriver *pOutput = Input.port? pOutput2:pOutput1;
     if(!pOutput)
       return;
+    
+    midi_out(msg);
+    
+    // Handle this event as Launchpad
+    CLaunchPadInput Input(msg);
       
     switch(Input.type)
     {
@@ -25,7 +27,7 @@ public:
         break;
     }
   }
-  void handleEvent(int iEvent, void *param, COutputDriver *pOutput1, COutputDriver *pOutput2)
+  void handleEvent(int iEvent, void *param, COutputDriver *pOutput)
   {
   }
 };

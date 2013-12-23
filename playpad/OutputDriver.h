@@ -12,7 +12,10 @@ public:
   enum { 
     CELL_MAX = 80,
     CELL_LED_MASK = 0x33,
-    CELL_DIRTY = 0x80
+    CELL_DIRTY = 0x80,
+    
+    GRID_DIRTY = 0x80,
+    GRID_CLEAR = 0x01
   };
   enum {
       LED_RED      = 0x03, 
@@ -29,9 +32,16 @@ public:
    byte m_status;
    byte m_ledStatus[CELL_MAX];
 public:
-   COutputDriver()
+   void init()
+   {
+     m_status = 0;
+     memset(m_ledStatus, 0, sizeof(m_ledStatus));
+   }
+   
+   void cls()
    {
      memset(m_ledStatus, 0, sizeof(m_ledStatus));
+     m_status = GRID_CLEAR;
    }
    
    void setGrid(byte row, byte col, byte value) 
@@ -42,7 +52,7 @@ public:
        if(value != (m_ledStatus[index]&CELL_LED_MASK))
        {
          m_ledStatus[index] = value|CELL_DIRTY;
-         m_status|=CELL_DIRTY;
+         m_status|=GRID_DIRTY;
        }
      }
    }
@@ -57,7 +67,16 @@ public:
   
    int getData(byte *buffer, byte port, int count)
    {
-     if(!(m_status&CELL_DIRTY))
+     if(m_status&GRID_CLEAR)
+     {
+       buffer[0] = 0xB0|port;
+       buffer[1] = 0;
+       buffer[2] = 0;
+       m_status&=~GRID_CLEAR;
+       return 3;
+     }
+     
+     if(!(m_status&GRID_DIRTY))
        return 0; // nothing to send
 
      int addr=0;     
@@ -104,7 +123,7 @@ public:
        }
        ++index;
      }
-     m_status&=~CELL_DIRTY;
+     m_status&=~GRID_DIRTY;
      return addr;
    }   
 };
